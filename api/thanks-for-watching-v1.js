@@ -1,17 +1,17 @@
 // Server function for Thanks For Watching. Runs on Vercel.
 // Signs people in through the shared Supabase accounts hub and talks to Cloudflare Stream.
-// Needs SUPABASE_SECRET_KEY, CF_ACCOUNT_ID and CF_STREAM_TOKEN set in Vercel.
+// Needs SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY, CF_ACCOUNT_ID and CF_STREAM_TOKEN set in Vercel.
 
-const SB_URL = "https://vogxdikogfaxhwcgajfg.supabase.co";
 const MAX_SECONDS = 60;
 const FLAG_LIMIT = 3;
 const TOKEN_LIFE = 3600;
 const DAILY_UPLOADS = 20;
 
 const SK = () => process.env.SUPABASE_SECRET_KEY || "";
+const SBU = () => process.env.SUPABASE_URL || "";
 
 async function db(path, opts = {}) {
-  const r = await fetch(SB_URL + "/rest/v1/" + path, {
+  const r = await fetch(SBU() + "/rest/v1/" + path, {
     method: opts.method || "GET",
     headers: Object.assign({ apikey: SK(), Authorization: "Bearer " + SK(), "Content-Type": "application/json" }, opts.headers || {}),
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined
@@ -31,7 +31,7 @@ const enc = encodeURIComponent;
 async function userFrom(req) {
   const tok = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
   if (!tok) return null;
-  const r = await fetch(SB_URL + "/auth/v1/user", { headers: { apikey: SK(), Authorization: "Bearer " + tok } });
+  const r = await fetch(SBU() + "/auth/v1/user", { headers: { apikey: SK(), Authorization: "Bearer " + tok } });
   if (!r.ok) return null;
   const u = await r.json();
   return u && u.id ? u : null;
@@ -123,6 +123,10 @@ module.exports = async (req, res) => {
   const body = (req.body && typeof req.body === "object") ? req.body : {};
   const device = String(req.headers["x-device-id"] || "").slice(0, 64);
   try {
+    if (op === "config") {
+      return res.status(200).json({ url: SBU(), key: process.env.SUPABASE_PUBLISHABLE_KEY || "" });
+    }
+
     if (op === "profile") {
       const h = String(req.query.u || "").toLowerCase();
       if (!/^[a-z0-9_]{3,24}$/.test(h)) return res.status(404).json({ error: "No such profile" });

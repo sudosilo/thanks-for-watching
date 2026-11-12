@@ -130,8 +130,6 @@
 <script src="https://embed.cloudflarestream.com/embed/sdk.latest.js"></script>
 <script>
 (function () {
-  var SB_URL = 'https://vogxdikogfaxhwcgajfg.supabase.co';
-  var SB_KEY = 'sb_publishable_b9N7M8W5NpGgsus1ZUQgaw_3QQBxFm1';
   var API = '/api/thanks-for-watching-v1';
   var $ = function (id) { return document.getElementById(id); };
   var LS = {
@@ -140,7 +138,12 @@
   };
   var device = LS.get('tfw-device');
   if (!device) { device = Math.random().toString(36).slice(2) + Date.now().toString(36); LS.set('tfw-device', device); }
-  var sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+  var sb = null;
+  var ready = fetch(API + '?op=config').then(function (r) { return r.json(); }).then(function (c) {
+    sb = window.supabase.createClient(c.url, c.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+    sb.auth.onAuthStateChange(function (evt) { if (evt === 'SIGNED_IN' || evt === 'USER_UPDATED') loadMe().catch(function () {}); });
+    return sb;
+  });
   var me = { handle: null, email: null, anonymous: true, badges: [] };
   var current = null, player = null, watchStart = 0, maxTime = 0;
 
@@ -151,7 +154,7 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
   function session() {
-    return sb.auth.getSession().then(function (r) {
+    return ready.then(function () { return sb.auth.getSession(); }).then(function (r) {
       if (r.data && r.data.session) return r.data.session;
       return sb.auth.signInAnonymously().then(function (a) {
         if (a.error) throw new Error('Could not start a session');
@@ -204,7 +207,7 @@
     if ($('handleBtn')) $('handleBtn').onclick = saveHandle;
     if ($('addMailBtn')) $('addMailBtn').onclick = addEmail;
     if ($('outBtn')) $('outBtn').onclick = function () {
-      sb.auth.signOut().then(function () { me = { handle: null, email: null, anonymous: true, badges: [] }; return loadMe(); }).then(refreshMenu, refreshMenu);
+      ready.then(function () { return sb.auth.signOut(); }).then(function () { me = { handle: null, email: null, anonymous: true, badges: [] }; return loadMe(); }).then(refreshMenu, refreshMenu);
       toast('Signed out');
     };
 
@@ -238,7 +241,7 @@
   function addEmail() {
     var m = ($('addMail').value || '').trim();
     if (!m) return toast('Type an email first');
-    sb.auth.updateUser({ email: m }, { emailRedirectTo: location.origin }).then(function (r) {
+    ready.then(function () { return sb.auth.updateUser({ email: m }, { emailRedirectTo: location.origin }); }).then(function (r) {
       if (r.error) return toast(r.error.message);
       toast('Check your email and tap the link to confirm');
     });
@@ -247,7 +250,7 @@
   $('mailBtn').onclick = function () {
     var m = ($('mailIn').value || '').trim();
     if (!m) return toast('Type an email first');
-    sb.auth.signInWithOtp({ email: m, options: { emailRedirectTo: location.origin } }).then(function (r) {
+    ready.then(function () { return sb.auth.signInWithOtp({ email: m, options: { emailRedirectTo: location.origin } }); }).then(function (r) {
       if (r.error) return toast(r.error.message);
       toast('Check your email for the sign in link');
     });
@@ -366,7 +369,6 @@
   window.addEventListener('pagehide', reportWatch);
   var u = new URLSearchParams(location.search).get('u');
   if (u) openProfile(u.toLowerCase());
-  sb.auth.onAuthStateChange(function (evt) { if (evt === 'SIGNED_IN' || evt === 'USER_UPDATED') loadMe().catch(function () {}); });
   loadMe().catch(function () {});
 })();
 </script>

@@ -1,4 +1,4 @@
--- Thanks For Watching tables. They live in the shared accounts hub project next to Kat Chat.
+-- Thanks For Watching tables. They live in the shared accounts hub project.
 -- Every table starts with tfw_ so it never collides with another app.
 -- Row level security is on with no policies, so only the server function (secret key) can touch them.
 
