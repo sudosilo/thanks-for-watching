@@ -99,11 +99,11 @@
   </details>
 
   <details>
-    <summary>Sign in with email</summary>
+    <summary>Log in with email</summary>
     <div class="sec">
       <p class="muted">Use the same email on any device and in any app that shares this sign in. We send you a sign in link.</p>
       <input type="text" id="mailIn" placeholder="you@example.com" autocomplete="email" inputmode="email" autocapitalize="none">
-      <button class="btn" id="mailBtn">Send sign in link</button>
+      <button class="btn" id="mailBtn">Send log in link</button>
     </div>
   </details>
 
@@ -188,6 +188,12 @@
   function refreshMenu() {
     var ab = $('accountBody'), pb = $('profileBody'), bb = $('badgeBody');
     var html = '';
+    if (!me.email) {
+      html += '<p class="muted">Already have an account? Log in with its email.</p>' +
+        '<input type="text" id="loginMail" placeholder="you@example.com" autocomplete="email" inputmode="email" autocapitalize="none">' +
+        '<button class="btn" id="loginBtn">Log in</button>' +
+        '<hr style="border:none;border-top:1px solid var(--line);margin:16px 0">';
+    }
     if (!me.handle) {
       html += '<p class="muted">Pick a handle. Watching works without one, but uploading and flagging need it.</p>' +
         '<input type="text" id="handleIn" placeholder="handle" autocomplete="off" autocapitalize="none">' +
@@ -205,6 +211,7 @@
     }
     ab.innerHTML = html;
     if ($('handleBtn')) $('handleBtn').onclick = saveHandle;
+    if ($('loginBtn')) $('loginBtn').onclick = function () { sendLogin(($('loginMail').value || '').trim()); };
     if ($('addMailBtn')) $('addMailBtn').onclick = addEmail;
     if ($('outBtn')) $('outBtn').onclick = function () {
       ready.then(function () { return sb.auth.signOut(); }).then(function () { me = { handle: null, email: null, anonymous: true, badges: [] }; return loadMe(); }).then(refreshMenu, refreshMenu);
@@ -235,7 +242,7 @@
 
   function saveHandle() {
     var h = ($('handleIn').value || '').trim().toLowerCase();
-    api('handle', { body: { handle: h } }).then(function (j) { me.handle = j.handle; refreshMenu(); toast('Handle saved'); }).catch(function (e) { toast(e.message); });
+    api('handle', { body: { handle: h } }).then(function (j) { me.handle = j.handle; refreshMenu(); toast(j.reclaimed ? 'Handle moved back to you' : 'Handle saved'); }).catch(function (e) { toast(e.message); });
   }
 
   function addEmail() {
@@ -247,14 +254,14 @@
     });
   }
 
-  $('mailBtn').onclick = function () {
-    var m = ($('mailIn').value || '').trim();
+  function sendLogin(m) {
     if (!m) return toast('Type an email first');
     ready.then(function () { return sb.auth.signInWithOtp({ email: m, options: { emailRedirectTo: location.origin } }); }).then(function (r) {
       if (r.error) return toast(r.error.message);
-      toast('Check your email for the sign in link');
+      toast('Check your email for the log in link');
     });
-  };
+  }
+  $('mailBtn').onclick = function () { sendLogin(($('mailIn').value || '').trim()); };
 
   $('pickBtn').onclick = function () {
     if (!me.handle) return toast('Pick a handle in the menu first');

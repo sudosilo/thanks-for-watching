@@ -166,7 +166,20 @@ module.exports = async (req, res) => {
       try {
         await db("tfw_profiles", { method: "POST", headers: { Prefer: "return=minimal" }, body: { user_id: me.id, handle: h } });
       } catch (e) {
-        if (e.status === 409) return res.status(409).json({ error: "That handle is taken" });
+        if (e.status !== 409) throw e;
+        const owner = (await db("tfw_profiles?handle=eq." + h + "&select=user_id"))[0];
+        const sameDevice = owner && device && (await db("tfw_devices?user_id=eq." + owner.user_id + "&device=eq." + enc(device) + "&select=device")).length;
+        let ownerAnon = false;
+        if (sameDevice) {
+          const ar = await fetch(SBU() + "/auth/v1/admin/users/" + owner.user_id, { headers: { apikey: SK(), Authorization: "Bearer " + SK() } });
+          const au = ar.ok ? await ar.json() : null;
+          ownerAnon = !!(au && (au.is_anonymous || !au.email));
+        }
+        if (!sameDevice || !ownerAnon) return res.status(409).json({ error: "That handle belongs to another account. If it is yours, tap Log in and use that account's email." });
+        await db("tfw_profiles?user_id=eq." + owner.user_id, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: { user_id: me.id } });
+        await db("tfw_videos?owner=eq." + owner.user_id, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: { owner: me.id } });
+        await noteDevice(me.id, device);
+        return res.status(200).json({ handle: h, reclaimed: true });
         throw e;
       }
       return res.status(200).json({ handle: h });
